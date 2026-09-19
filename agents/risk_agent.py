@@ -1,3 +1,12 @@
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+from feedback.feedback_manager import format_overrides_for_prompt
 from typing import Literal
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -46,63 +55,80 @@ structured_llm = llm.with_structured_output(RiskAssessment)
 
 def assess_risk(report: SafetyReportAnalysis) -> RiskAssessment:
 
+    # Retrieve latest human corrections
+    correction_examples = format_overrides_for_prompt(limit=5)
+
     prompt = f"""
 You are the Risk Scoring Agent for SafeSight AI.
 
-Evaluate the workplace safety information below.
+Your task is to classify the safety report as:
+LOW, MEDIUM, or HIGH.
 
-Use this risk framework:
+RISK FRAMEWORK
 
 LOW:
 - Minor unsafe condition or behaviour
-- Limited potential for injury
+- Limited injury potential
 - No indication of serious harm
 - Routine corrective action is appropriate
 
 MEDIUM:
 - Meaningful hazard that could cause injury
 - Unsafe behaviour, equipment, environment, or process
-- Could escalate if repeated or left unresolved
-- Requires timely corrective action
+- Could escalate if repeated or unresolved
+- Timely corrective action is required
 
 HIGH:
-- Serious injury has occurred OR
-- There is clear potential for severe injury, permanent disability,
-  hospitalization, fatality, major equipment incident, or similarly
-  severe consequence
-- Requires urgent safety attention
+- Serious injury occurred, OR
+- Clear potential for severe injury, permanent disability,
+  hospitalization, fatality, or major equipment incident
+- Urgent attention is required
 
-Important:
-- Consider both actual consequence and potential consequence.
-- Do not classify based only on keywords.
-- Use the extracted risk factors and context.
-- Give concise reasoning.
-- Confidence must be between 0 and 1.
-- Recommend a practical safety response.
 
-PARSED SAFETY REPORT:
+HUMAN SAFETY OFFICER CORRECTIONS
+
+The following are recent corrections made by safety officers.
+
+Use them as examples of how human safety officers apply risk
+judgement. Do not blindly copy their classifications. Apply the
+same reasoning principles to the current report.
+
+{correction_examples}
+
+
+CURRENT PARSED SAFETY REPORT
 
 Hazard:
 {report.hazard_type}
 
 Risk factors:
-{", ".join(report.risk_factors)}
+{report.risk_factors}
 
 Location/context:
 {report.location_context}
 
 Equipment involved:
-{", ".join(report.equipment_involved) if report.equipment_involved else "None identified"}
+{report.equipment_involved}
 
 People at risk:
-{", ".join(report.people_at_risk)}
+{report.people_at_risk}
 
-Potential/actual consequence:
+Potential consequence:
 {report.potential_consequence}
+
+
+INSTRUCTIONS
+
+- Consider both actual and potential consequences.
+- Consider the extracted risk factors and context.
+- Use relevant human corrections as additional guidance.
+- Do not classify based on keywords alone.
+- Provide concise reasoning.
+- Confidence must be between 0 and 1.
+- Recommend a practical safety response.
 """
 
     return structured_llm.invoke(prompt)
-
 
 # --------------------------------------------------
 # Test

@@ -14,7 +14,7 @@ __pycache__/
 
 # SafeSight generated data
 vectorstore/
-feedback/
+feedback/risk_overrides.json
 
 # OS / IDE
 .DS_Store
