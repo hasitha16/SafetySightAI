@@ -162,17 +162,90 @@ def load_vector_store():
 
 def retrieve_similar_reports(query, k=5):
     """
-    Retrieve safety reports most relevant to a query.
+    Retrieve and rerank safety reports relevant to a query.
     """
 
     vector_store = load_vector_store()
 
+    # Retrieve a larger candidate set first
     retriever = vector_store.as_retriever(
-        search_kwargs={"k": k}
+        search_type="similarity",
+        search_kwargs={"k": 20}
     )
 
-    return retriever.invoke(query)
+    candidates = retriever.invoke(query)
 
+    query_lower = query.lower()
+
+    machinery_terms = [
+        "machinery",
+        "machine",
+        "equipment"
+    ]
+
+    maintenance_terms = [
+        "maintenance",
+        "repair",
+        "cleaning",
+        "service"
+    ]
+
+    scored_documents = []
+
+    for document in candidates:
+
+        text = document.page_content.lower()
+
+        event_type = str(
+            document.metadata.get(
+                "event_type",
+                ""
+            )
+        ).lower()
+
+        combined_text = f"{text} {event_type}"
+
+        score = 0
+
+        # Reward machinery relevance
+        if any(
+            term in combined_text
+            for term in machinery_terms
+        ):
+            score += 2
+
+        # Reward maintenance/cleaning relevance
+        if any(
+            term in combined_text
+            for term in maintenance_terms
+        ):
+            score += 2
+
+        # Strong reward when OSHA incident classification
+        # explicitly identifies machinery maintenance/cleaning
+        if (
+            "machinery during maintenance"
+            in event_type
+            or
+            "machinery during maintenance, cleaning"
+            in event_type
+        ):
+            score += 4
+
+        scored_documents.append(
+            (score, document)
+        )
+
+    scored_documents.sort(
+        key=lambda item: item[0],
+        reverse=True
+    )
+
+    return [
+        document
+        for _, document
+        in scored_documents[:k]
+    ]
 
 # --------------------------------------------------
 # TEST
