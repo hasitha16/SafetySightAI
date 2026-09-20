@@ -25,7 +25,7 @@ from agents.coordinator import (
     analyze_with_coordinator,
     ask_with_coordinator,
 )
-
+from feedback.feedback_manager import save_risk_override
 
 # ==================================================
 # FILE PATHS
@@ -1170,9 +1170,32 @@ elif page == "Analyze Report":
 
         if result.get("error"):
 
-            st.error(
-                f'Analysis stopped: {result["error"]}'
-            )
+            error_message = str(result["error"])
+
+            if (
+                "429" in error_message
+                or "RESOURCE_EXHAUSTED" in error_message                    or "quota" in error_message.lower()
+            ):
+
+                st.warning(
+                    "AI analysis is temporarily unavailable because "
+                    "the language-model request limit has been reached. "
+                    "Please try again after the API quota resets."
+                )
+
+                st.caption(
+                        "Historical analytics and the Safety Advisor "
+                    "remain available."
+                )
+
+            else:
+
+                st.error(
+                    "The report analysis could not be completed."
+                )
+
+                with st.expander("Technical details"):
+                    st.code(error_message)
 
         else:
 
@@ -1252,44 +1275,23 @@ elif page == "Analyze Report":
                 )
 
             st.markdown(
-                f"""
-                <div style="
-                    background:{risk_background};
-                    border:1px solid {risk_border};
-                    border-radius:14px;
-                    padding:22px 24px;
-                    margin-bottom:25px;
-                ">
-
-                    <div style="
-                        color:{risk_text};
-                        font-size:12px;
-                        font-weight:800;
-                        letter-spacing:1px;
-                    ">
-                        {risk_level} RISK
-                    </div>
-
-                    <div style="
-                        color:#101828;
-                        font-size:22px;
-                        font-weight:750;
-                        margin-top:5px;
-                    ">
-                        {risk_message}
-                    </div>
-
-                    <div style="
-                        color:#667085;
-                        font-size:13px;
-                        margin-top:7px;
-                    ">
-                        Agent confidence:
-                        {confidence * 100:.0f}%
-                    </div>
-
-                </div>
-                """,
+                (
+                    f'<div style="color:{risk_color};'
+                    'font-size:12px;font-weight:800;'
+                    'letter-spacing:1px;">'
+                    f'{risk_level} RISK'
+                    '</div>'
+                    '<div style="color:#101828;'
+                    'font-size:22px;font-weight:750;'
+                    'margin-top:5px;">'
+                    f'{risk_message}'
+                    '</div>'
+                    '<div style="color:#667085;'
+                    'font-size:13px;margin-top:7px;">'
+                    'Agent confidence: '
+                    f'{confidence:.0%}'
+                    '</div>'
+                ),
                 unsafe_allow_html=True
             )
 
@@ -1481,6 +1483,101 @@ elif page == "Analyze Report":
                 )
 
             # ==========================================
+            # HUMAN RISK OVERRIDE
+            # ==========================================
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown(
+                """
+                <div class="section-title">
+                    Human risk review
+                </div>
+
+                <div class="section-description">
+                    A safety officer can correct the AI-assigned risk
+                    level and record the reason for the decision.
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.caption(
+                f"AI classification: {risk_level}"
+            )
+
+            corrected_risk = st.selectbox(
+                "Corrected risk level",
+                ["LOW", "MEDIUM", "HIGH"],
+                index=(
+                    ["LOW", "MEDIUM", "HIGH"].index(risk_level)
+                    if risk_level in ["LOW", "MEDIUM", "HIGH"]
+                    else 1
+                ),
+                key="corrected_risk"
+            )
+
+            override_reason = st.text_area(
+                "Reason for correction",
+                placeholder=(
+                    "Example: The machine was operating without "
+                    "isolation, creating a potential for serious injury."
+                ),
+                key="override_reason"
+            )
+
+            save_override_clicked = st.button(
+                "Save risk override",
+                key="save_risk_override"
+            )
+
+            if save_override_clicked:
+
+                if corrected_risk == risk_level:
+
+                    st.warning(
+                        "Select a different risk level before "
+                        "saving an override."
+                    )
+
+                elif not override_reason.strip():
+
+                    st.warning(
+                        "Enter a reason for the risk correction."
+                    )
+
+                else:
+
+                    try:
+
+                        save_risk_override(
+                            report_id="DASHBOARD",
+                            report_text=st.session_state.get(
+                                "latest_report_text",
+                                ""
+                            ),
+                            original_risk=risk_level,
+                            corrected_risk=corrected_risk,
+                            reason=override_reason.strip()
+                        )
+
+                        st.success(
+                            f"Risk corrected from {risk_level} "
+                            f"to {corrected_risk}. "
+                            "The review has been logged."
+                        )
+
+                    except Exception as error:
+
+                        st.error(
+                            "The risk override could not be saved."
+                        )
+
+                        with st.expander("Technical details"):
+                            st.code(str(error))
+
+
+            # ==========================================
             # HISTORICAL RAG EVIDENCE
             # ==========================================
 
@@ -1518,29 +1615,43 @@ elif page == "Analyze Report":
                         ""
                     )
 
-                    report_id = metadata.get(
+                    report_id = incident.get(
                         "report_id",
                         "Unknown"
                     )
 
-                    city = metadata.get(
+                    city = incident.get(
                         "city",
                         "Unknown"
                     )
 
-                    state = metadata.get(
+                    state = incident.get(
                         "state",
                         "Unknown"
                     )
 
-                    event_type = metadata.get(
+                    event_date = incident.get(
+                        "event_date",
+                        "Unknown"
+                    )
+
+                    event_type = incident.get(
                         "event_type",
                         "Unknown"
                     )
 
+                    injury_nature = incident.get(
+                        "injury_nature",
+                        "Unknown"
+                    )
+
+                    content = incident.get(
+                        "content",
+                        ""
+                    )
                     with st.expander(
-                        f"Historical incident {index}  •  "
-                        f"{city}, {state}  •  "
+                        f"Incident {index}  •  "
+                        f"{city.title()}, {state.title()}  •  "
                         f"Report {report_id}"
                     ):
 
@@ -1548,11 +1659,15 @@ elif page == "Analyze Report":
                             f"**Incident type:** {event_type}"
                         )
 
-                        st.write(content)
-
-                        st.caption(
-                            f"Historical report ID: {report_id}"
+                        st.markdown(
+                            f"**Date:** {event_date}"
                         )
+
+                        st.markdown(
+                            f"**Injury:** {injury_nature}"
+                        )
+
+                        st.write(content)
 
             else:
 
@@ -2195,36 +2310,57 @@ elif page == "Safety Advisor":
                         start=1
                     ):
 
-                        metadata = incident.get(
-                            "metadata",
-                            {}
-                        )
-
+                        # search_similar_incidents returns metadata
+                        # as top-level fields, not under "metadata".
                         content = incident.get(
                             "content",
                             ""
                         )
 
-                        report_id = metadata.get(
+                        report_id = incident.get(
                             "report_id",
                             "Unknown"
                         )
 
-                        city = metadata.get(
+                        city = incident.get(
                             "city",
                             "Unknown"
                         )
 
-                        state = metadata.get(
+                        state = incident.get(
                             "state",
+                            "Unknown"
+                        )
+
+                        event_type = incident.get(
+                            "event_type",
+                            "Unknown"
+                        )
+
+                        event_date = incident.get(
+                            "event_date",
+                            "Unknown"
+                        )
+
+                        injury_nature = incident.get(
+                            "injury_nature",
                             "Unknown"
                         )
 
                         with st.expander(
                             f"Incident {index}  •  "
-                            f"{city}, {state}  •  "
+                            f"{city.title()}, {state.title()}  •  "
                             f"Report {report_id}"
                         ):
+
+                            st.markdown(
+                                f"**Incident type:** {event_type}"
+                            )
+
+                            st.caption(
+                                f"Event date: {event_date}  •  "
+                                f"Injury: {injury_nature}"
+                            )
 
                             st.write(content)
 
