@@ -230,6 +230,15 @@ st.markdown(
     }
 
 
+
+
+    /* ---------- Safety Action Center ---------- */
+    .action-card { background:#fff; border:1px solid #eaecf0; border-radius:12px; padding:18px 19px; min-height:245px; box-shadow:0 1px 2px rgba(16,24,40,.03); }
+    .action-priority { color:#175cd3; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.7px; margin-bottom:8px; }
+    .action-title { color:#101828; font-size:16px; font-weight:750; line-height:1.35; margin-bottom:12px; }
+    .action-label { color:#475467; font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.45px; margin-top:10px; }
+    .action-text { color:#344054; font-size:13px; line-height:1.5; margin-top:3px; }
+
     /* ---------- Signal Banner ---------- */
 
     .signal-card {
@@ -525,10 +534,64 @@ if page == "Overview":
 
 
     # ----------------------------------------------
+    # INTERACTIVE FILTERS
+    # ----------------------------------------------
+
+    st.markdown(
+        """
+        <div class="section-title">Explore the safety data</div>
+        <div class="section-description">
+            Filter the overview by state and year to investigate a specific operating context.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    filter_left, filter_right = st.columns(2)
+
+    state_options = ["All states"] + sorted(
+        [str(value) for value in df["state"].dropna().unique()]
+    )
+    available_years = sorted(
+        df["event_date"].dropna().dt.year.astype(int).unique().tolist(),
+        reverse=True
+    )
+    year_options = ["All years"] + [str(year) for year in available_years]
+
+    with filter_left:
+        selected_state = st.selectbox(
+            "State", state_options, key="overview_state_filter"
+        )
+
+    with filter_right:
+        selected_year = st.selectbox(
+            "Year", year_options, key="overview_year_filter"
+        )
+
+    filtered_df = df.copy()
+
+    if selected_state != "All states":
+        filtered_df = filtered_df[
+            filtered_df["state"].astype(str) == selected_state
+        ]
+
+    if selected_year != "All years":
+        filtered_df = filtered_df[
+            filtered_df["event_date"].dt.year == int(selected_year)
+        ]
+
+    filtered_patterns = detect_recurring_patterns(filtered_df)
+
+    st.caption(
+        f"Viewing {len(filtered_df):,} reports · "
+        f"{selected_state} · {selected_year}"
+    )
+
+    # ----------------------------------------------
     # METRICS
     # ----------------------------------------------
 
-    outcomes = patterns[
+    outcomes = filtered_patterns[
         "serious_outcomes"
     ]
 
@@ -539,7 +602,7 @@ if page == "Overview":
         </div>
 
         <div class="section-description">
-            Based on the historical incident dataset.
+            Based on the selected historical incident view.
         </div>
         """,
         unsafe_allow_html=True
@@ -622,7 +685,7 @@ if page == "Overview":
         )
 
         yearly = (
-            patterns["yearly_trends"]
+            filtered_patterns["yearly_trends"]
             .copy()
         )
 
@@ -699,7 +762,7 @@ if page == "Overview":
         )
 
         incidents = (
-            patterns["incident_types"]
+            filtered_patterns["incident_types"]
             .head(7)
             .copy()
         )
@@ -790,7 +853,7 @@ if page == "Overview":
     # EMERGING SIGNAL
     # ----------------------------------------------
 
-    emerging = patterns.get(
+    emerging = filtered_patterns.get(
         "emerging_incidents"
     )
 
@@ -845,6 +908,239 @@ if page == "Overview":
             unsafe_allow_html=True
         )
 
+
+
+    # ----------------------------------------------
+    # RISK HOTSPOT MATRIX
+    # ----------------------------------------------
+
+    st.markdown(
+        """
+        <div class="section-title" style="margin-top: 26px;">
+            Risk Hotspot Matrix
+        </div>
+        <div class="section-description">
+            Compare frequently recorded incident categories with serious historical outcomes
+            in the selected view.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    hotspot_source = filtered_df[
+        filtered_df["event_type"].notna()
+        & (filtered_df["event_type"].astype(str).str.strip() != "")
+        & (filtered_df["event_type"].astype(str) != "Unknown")
+    ].copy()
+
+    if not hotspot_source.empty:
+        hotspot = (
+            hotspot_source.groupby("event_type", as_index=False)
+            .agg(
+                reports=("report_id", "count"),
+                hospitalizations=("hospitalized", "sum"),
+                amputations=("amputation", "sum"),
+            )
+        )
+
+        hotspot["serious_outcomes"] = (
+            hotspot["hospitalizations"] + hotspot["amputations"]
+        )
+        hotspot["serious_outcome_rate"] = (
+            hotspot["serious_outcomes"] / hotspot["reports"] * 100
+        ).round(1)
+
+        # Focus on categories with meaningful report volume so tiny categories
+        # do not dominate the visual.
+        hotspot = hotspot.sort_values("reports", ascending=False).head(20)
+
+        fig_hotspot = px.scatter(
+            hotspot,
+            x="reports",
+            y="serious_outcome_rate",
+            size="serious_outcomes",
+            hover_name="event_type",
+            custom_data=[
+                "hospitalizations",
+                "amputations",
+                "serious_outcomes"
+            ],
+            labels={
+                "reports": "Report frequency",
+                "serious_outcome_rate": "Serious outcomes per 100 reports",
+                "serious_outcomes": "Serious outcomes"
+            }
+        )
+
+        fig_hotspot.update_traces(
+            marker=dict(
+                opacity=0.78,
+                line=dict(width=1)
+            ),
+            hovertemplate=(
+                "<b>%{hovertext}</b>"
+                "<br>Reports: %{x:,}"
+                "<br>Serious outcomes / 100 reports: %{y:.1f}"
+                "<br>Hospitalizations: %{customdata[0]:,}"
+                "<br>Amputations: %{customdata[1]:,}"
+                "<extra></extra>"
+            )
+        )
+
+        fig_hotspot.update_layout(
+            height=430,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            showlegend=False,
+            margin=dict(l=10, r=20, t=20, b=10),
+            font=dict(color="#344054"),
+            xaxis=dict(
+                gridcolor="#d0d5dd",
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
+            ),
+            yaxis=dict(
+                gridcolor="#d0d5dd",
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
+            )
+        )
+
+        st.plotly_chart(
+            fig_hotspot,
+            use_container_width=True,
+            config={"displayModeBar": False}
+        )
+
+        st.caption(
+            "Bubble size represents the number of recorded serious outcomes. "
+            "This is a historical prioritization view, not a prediction of future risk."
+        )
+    else:
+        st.info("No incident categories are available for the selected filters.")
+
+    # ----------------------------------------------
+    # EXPORT INVESTIGATION SUMMARY
+    # ----------------------------------------------
+
+    top_recurring_export = "Not available"
+    incident_export = filtered_patterns.get("incident_types")
+    if incident_export is not None and not incident_export.empty:
+        recurring_row = incident_export.iloc[0]
+        if "incident_type" in incident_export.columns:
+            top_recurring_export = str(recurring_row["incident_type"])
+        elif "event_type" in incident_export.columns:
+            top_recurring_export = str(recurring_row["event_type"])
+        else:
+            top_recurring_export = str(recurring_row.iloc[0])
+
+    emerging_export = filtered_patterns.get("emerging_incidents")
+    top_emerging_export = "Not available"
+    if emerging_export is not None and not emerging_export.empty:
+        emerging_row = emerging_export.iloc[0]
+        if "incident_type" in emerging_export.columns:
+            top_emerging_export = str(emerging_row["incident_type"])
+        elif "event_type" in emerging_export.columns:
+            top_emerging_export = str(emerging_row["event_type"])
+        else:
+            top_emerging_export = str(emerging_row.iloc[0])
+
+    export_summary = pd.DataFrame(
+        [
+            {
+                "Selected state": selected_state,
+                "Selected year": selected_year,
+                "Reports analyzed": int(outcomes["total_reports"]),
+                "Hospitalizations": int(outcomes["hospitalized"]),
+                "Amputations": int(outcomes["amputations"]),
+                "Hospitalization rate (%)": float(outcomes["hospitalization_rate"]),
+                "Strongest emerging signal": top_emerging_export,
+                "Most recurring incident": top_recurring_export,
+                "Suggested review priority": (
+                    "Investigate emerging and recurring hazards, verify existing "
+                    "controls, and prioritize categories associated with serious outcomes."
+                ),
+            }
+        ]
+    )
+
+    export_csv = export_summary.to_csv(index=False).encode("utf-8")
+
+    st.markdown(
+        """
+        <div class="section-title" style="margin-top: 26px;">
+            Investigation Export
+        </div>
+        <div class="section-description">
+            Export the current filtered safety context for review, handover or follow-up.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.download_button(
+        label="Download investigation summary",
+        data=export_csv,
+        file_name="safesight_investigation_summary.csv",
+        mime="text/csv",
+        use_container_width=False,
+    )
+
+    # ----------------------------------------------
+    # SAFETY ACTION CENTER
+    # ----------------------------------------------
+    st.markdown(
+        """
+        <div class="section-title" style="margin-top: 26px;">Safety Action Center</div>
+        <div class="section-description">Evidence-led priorities to help a safety officer decide what to investigate next.</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    recurring = filtered_patterns["incident_types"].iloc[0]
+    recurring_name = str(recurring["incident_type"]).strip()
+    recurring_count = int(recurring["count"])
+    action1, action2, action3 = st.columns(3, gap="medium")
+
+    if emerging is not None and len(emerging) > 0:
+        with action1:
+            st.markdown(
+                f"""<div class="action-card">
+                <div class="action-priority">Priority 01 · Emerging</div>
+                <div class="action-title">{incident_name}</div>
+                <div class="action-label">Evidence</div>
+                <div class="action-text">Reports changed from <b>{previous_count}</b> to <b>{recent_count}</b> ({growth:.1f}% increase) in the latest comparison period.</div>
+                <div class="action-label">Suggested review</div>
+                <div class="action-text">Investigate recent locations, tasks and controls associated with this signal.</div>
+                </div>""",
+                unsafe_allow_html=True
+            )
+
+    with action2:
+        st.markdown(
+            f"""<div class="action-card">
+            <div class="action-priority">Priority 02 · Recurring</div>
+            <div class="action-title">{recurring_name}</div>
+            <div class="action-label">Evidence</div>
+            <div class="action-text"><b>{recurring_count:,}</b> historical reports make this the most frequently recorded incident type in the dataset.</div>
+            <div class="action-label">Suggested review</div>
+            <div class="action-text">Review recurring work conditions and existing controls around this incident category.</div>
+            </div>""",
+            unsafe_allow_html=True
+        )
+
+    with action3:
+        st.markdown(
+            f"""<div class="action-card">
+            <div class="action-priority">Priority 03 · Serious outcomes</div>
+            <div class="action-title">High-consequence incident review</div>
+            <div class="action-label">Evidence</div>
+            <div class="action-text"><b>{outcomes['hospitalized']:,}</b> hospitalizations and <b>{outcomes['amputations']:,}</b> amputations are recorded in the historical dataset.</div>
+            <div class="action-label">Suggested review</div>
+            <div class="action-text">Prioritize investigation of recurring hazards associated with severe outcomes and verify critical controls.</div>
+            </div>""",
+            unsafe_allow_html=True
+        )
 
     # ----------------------------------------------
     # RESPONSIBLE USE
