@@ -283,6 +283,46 @@ st.markdown(
 }
 
 
+    /* ---------- Readability ---------- */
+
+    .page-description,
+    .section-description,
+    .info-panel-text {
+        color: #475467 !important;
+    }
+
+    /* Streamlit expanders can inherit very light text in some themes. */
+    div[data-testid="stExpander"] {
+        background: #ffffff;
+        border: 1px solid #d0d5dd;
+        border-radius: 10px;
+    }
+
+    div[data-testid="stExpander"] summary,
+    div[data-testid="stExpander"] summary *,
+    div[data-testid="stExpander"] details summary,
+    div[data-testid="stExpander"] details summary * {
+        color: #101828 !important;
+        font-weight: 650 !important;
+    }
+
+    div[data-testid="stExpander"] svg {
+        fill: #344054 !important;
+        color: #344054 !important;
+    }
+
+    div[data-testid="stExpander"] [data-testid="stMarkdownContainer"],
+    div[data-testid="stExpander"] [data-testid="stMarkdownContainer"] *,
+    div[data-testid="stExpander"] p {
+        color: #344054 !important;
+    }
+
+    /* Keep dataframe text readable in light mode. */
+    div[data-testid="stDataFrame"] {
+        color: #101828 !important;
+    }
+
+
     /* ---------- Streamlit details ---------- */
 
     #MainMenu {
@@ -625,13 +665,17 @@ if page == "Overview":
                 b=10
             ),
             font=dict(
-                color="#667085"
+                color="#344054"
             ),
             xaxis=dict(
-                showgrid=False
+                showgrid=False,
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
             ),
             yaxis=dict(
-                gridcolor="#eaecf0"
+                gridcolor="#d0d5dd",
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
             )
         )
 
@@ -718,14 +762,18 @@ if page == "Overview":
                 b=10
             ),
             font=dict(
-                color="#667085",
+                color="#344054",
                 size=11
             ),
             xaxis=dict(
-                gridcolor="#eaecf0"
+                gridcolor="#d0d5dd",
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
             ),
             yaxis=dict(
-                showgrid=False
+                showgrid=False,
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
             )
         )
 
@@ -803,23 +851,13 @@ if page == "Overview":
     # ----------------------------------------------
 
     st.markdown(
-        """
-        <div class="info-panel">
-
-            <div class="info-panel-title">
-                About these signals
-            </div>
-
-            <p class="info-panel-text">
-                SafeSight uses historical workplace incident
-                data to surface recurring and changing safety
-                patterns. These signals support human safety
-                review and are not predictions that a future
-                incident will occur.
-            </p>
-
-        </div>
-        """,
+        '<div class="info-panel">'
+        '<div class="info-panel-title">About these signals</div>'
+        '<p class="info-panel-text">'
+        'SafeSight uses historical workplace incident data to surface recurring '
+        'and changing safety patterns. These signals support human safety review '
+        'and are not predictions that a future incident will occur.'
+        '</p></div>',
         unsafe_allow_html=True
     )
 
@@ -883,26 +921,17 @@ elif page == "Emerging Precursors":
         ).strip()
 
         st.markdown(
-            f"""
-            <div class="signal-card">
-                <div class="signal-label">
-                    Strongest emerging signal
-                </div>
-
-                <div class="signal-title">
-                    {signal_name}
-                </div>
-
-                <div class="signal-text">
-                    This category increased from
-                    <b>{int(top_signal["previous_count"])}</b>
-                    reports in the previous comparison period to
-                    <b>{int(top_signal["recent_count"])}</b>
-                    in the recent period — an increase of
-                    <b>{top_signal["growth_percent"]:.1f}%</b>.
-                </div>
-            </div>
-            """,
+            (
+                '<div class="signal-card">'
+                '<div class="signal-label">Strongest emerging signal</div>'
+                f'<div class="signal-title">{signal_name}</div>'
+                '<div class="signal-text">This category increased from '
+                f'<b>{int(top_signal["previous_count"])}</b> reports in the previous '
+                'comparison period to '
+                f'<b>{int(top_signal["recent_count"])}</b> in the recent period — '
+                f'an increase of <b>{top_signal["growth_percent"]:.1f}%</b>.'
+                '</div></div>'
+            ),
             unsafe_allow_html=True
         )
 
@@ -986,14 +1015,18 @@ elif page == "Emerging Precursors":
                 b=10
             ),
             font=dict(
-                color="#667085"
+                color="#344054"
             ),
             xaxis=dict(
-                gridcolor="#eaecf0",
-                title="Growth (%)"
+                gridcolor="#d0d5dd",
+                title="Growth (%)",
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
             ),
             yaxis=dict(
-                showgrid=False
+                showgrid=False,
+                tickfont=dict(color="#344054", size=12),
+                title_font=dict(color="#344054", size=13)
             )
         )
 
@@ -1053,23 +1086,14 @@ elif page == "Emerging Precursors":
         # ------------------------------------------
 
         st.markdown(
-            """
-            <div class="info-panel">
-                <div class="info-panel-title">
-                    How to interpret these signals
-                </div>
-
-                <p class="info-panel-text">
-                    A large percentage increase does not
-                    automatically mean a category is the most
-                    dangerous. Categories with small historical
-                    counts can show large percentage changes.
-                    SafeSight surfaces these changes for human
-                    investigation rather than treating them as
-                    predictions.
-                </p>
-            </div>
-            """,
+            '<div class="info-panel">'
+            '<div class="info-panel-title">How to interpret these signals</div>'
+            '<p class="info-panel-text">'
+            'A large percentage increase does not automatically mean a category is '
+            'the most dangerous. Categories with small historical counts can show '
+            'large percentage changes. SafeSight surfaces these changes for human '
+            'investigation rather than treating them as predictions.'
+            '</p></div>',
             unsafe_allow_html=True
         )
 
@@ -1276,7 +1300,7 @@ elif page == "Analyze Report":
 
             st.markdown(
                 (
-                    f'<div style="color:{risk_color};'
+                    f'<div style="color:{risk_text};'
                     'font-size:12px;font-weight:800;'
                     'letter-spacing:1px;">'
                     f'{risk_level} RISK'
@@ -1605,50 +1629,17 @@ elif page == "Analyze Report":
                     start=1
                 ):
 
-                    metadata = item.get(
-                        "metadata",
-                        {}
-                    )
+                    metadata = item.get("metadata", {}) or {}
 
-                    content = item.get(
-                        "content",
-                        ""
-                    )
-
-                    report_id = incident.get(
-                        "report_id",
-                        "Unknown"
-                    )
-
-                    city = incident.get(
-                        "city",
-                        "Unknown"
-                    )
-
-                    state = incident.get(
-                        "state",
-                        "Unknown"
-                    )
-
-                    event_date = incident.get(
-                        "event_date",
-                        "Unknown"
-                    )
-
-                    event_type = incident.get(
-                        "event_type",
-                        "Unknown"
-                    )
-
-                    injury_nature = incident.get(
-                        "injury_nature",
-                        "Unknown"
-                    )
-
-                    content = incident.get(
-                        "content",
-                        ""
-                    )
+                    # RAG evidence may expose metadata either as top-level
+                    # fields or inside a nested metadata dictionary.
+                    report_id = item.get("report_id", metadata.get("report_id", "Unknown"))
+                    city = item.get("city", metadata.get("city", "Unknown"))
+                    state = item.get("state", metadata.get("state", "Unknown"))
+                    event_date = item.get("event_date", metadata.get("event_date", "Unknown"))
+                    event_type = item.get("event_type", metadata.get("event_type", "Unknown"))
+                    injury_nature = item.get("injury_nature", metadata.get("injury_nature", "Unknown"))
+                    content = item.get("content", "")
                     with st.expander(
                         f"Incident {index}  •  "
                         f"{city.title()}, {state.title()}  •  "
@@ -1681,24 +1672,13 @@ elif page == "Analyze Report":
             # ==========================================
 
             st.markdown(
-                """
-                <div class="info-panel">
-
-                    <div class="info-panel-title">
-                        Human review remains in control
-                    </div>
-
-                    <p class="info-panel-text">
-                        SafeSight's AI-generated risk assessment
-                        supports safety officers by organizing
-                        information and retrieving historical
-                        evidence. Final safety decisions should
-                        follow workplace procedures and
-                        professional judgement.
-                    </p>
-
-                </div>
-                """,
+                '<div class="info-panel">'
+                '<div class="info-panel-title">Human review remains in control</div>'
+                '<p class="info-panel-text">'
+                "SafeSight's AI-generated risk assessment supports safety officers by "
+                'organizing information and retrieving historical evidence. Final safety '
+                'decisions should follow workplace procedures and professional judgement.'
+                '</p></div>',
                 unsafe_allow_html=True
             )
 
@@ -2101,13 +2081,17 @@ elif page == "Safety Advisor":
                                 b=10
                             ),
                             font=dict(
-                                color="#667085"
+                                color="#344054"
                             ),
                             xaxis=dict(
-                                gridcolor="#eaecf0"
+                                gridcolor="#d0d5dd",
+                                tickfont=dict(color="#344054", size=12),
+                                title_font=dict(color="#344054", size=13)
                             ),
                             yaxis=dict(
-                                showgrid=False
+                                showgrid=False,
+                                tickfont=dict(color="#344054", size=12),
+                                title_font=dict(color="#344054", size=13)
                             )
                         )
 
