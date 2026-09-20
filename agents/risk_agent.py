@@ -11,7 +11,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from report_parser import SafetyReportAnalysis
+from agents.report_parser import SafetyReportAnalysis
 
 
 # --------------------------------------------------

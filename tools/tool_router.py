@@ -145,7 +145,8 @@ def run_safety_tool(question: str) -> Dict[str, Any]:
 
         if location is None:
             return {
-                "tool": selected_tool,
+                "selected_tool": selected_tool,
+                "result": {},
                 "error": "A location could not be identified."
             }
 
@@ -167,7 +168,7 @@ def run_safety_tool(question: str) -> Dict[str, Any]:
         )
 
     return {
-        "tool": selected_tool,
+        "selected_tool": selected_tool,
         "result": result
     }
 
@@ -192,7 +193,7 @@ if __name__ == "__main__":
         response = run_safety_tool(question)
 
         print("\nSelected Tool:")
-        print(response["tool"])
+        print(response["selected_tool"])
 
         print("\nTool Result:")
 
